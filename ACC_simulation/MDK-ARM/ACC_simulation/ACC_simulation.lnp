@@ -1,0 +1,22 @@
+--cpu Cortex-M3
+"acc_simulation\startup_stm32f103xb.o"
+"acc_simulation\main.o"
+"acc_simulation\stm32f1xx_it.o"
+"acc_simulation\stm32f1xx_hal_msp.o"
+"acc_simulation\stm32f1xx_hal_gpio_ex.o"
+"acc_simulation\stm32f1xx_hal_uart.o"
+"acc_simulation\stm32f1xx_hal.o"
+"acc_simulation\stm32f1xx_hal_rcc.o"
+"acc_simulation\stm32f1xx_hal_rcc_ex.o"
+"acc_simulation\stm32f1xx_hal_gpio.o"
+"acc_simulation\stm32f1xx_hal_dma.o"
+"acc_simulation\stm32f1xx_hal_cortex.o"
+"acc_simulation\stm32f1xx_hal_pwr.o"
+"acc_simulation\stm32f1xx_hal_flash.o"
+"acc_simulation\stm32f1xx_hal_flash_ex.o"
+"acc_simulation\stm32f1xx_hal_exti.o"
+"acc_simulation\system_stm32f1xx.o"
+--strict --scatter "ACC_simulation\ACC_simulation.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "ACC_simulation.map" -o ACC_simulation\ACC_simulation.axf
