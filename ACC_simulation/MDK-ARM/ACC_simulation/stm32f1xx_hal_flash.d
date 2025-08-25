@@ -24,4 +24,6 @@ acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f
 acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash.h
 acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h
 acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_pwr.h
+acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim.h
+acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
 acc_simulation\stm32f1xx_hal_flash.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h

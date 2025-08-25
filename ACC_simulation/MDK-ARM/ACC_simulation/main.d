@@ -25,4 +25,9 @@ acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_cortex.
 acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash.h
 acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h
 acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_pwr.h
+acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim.h
+acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_tim_ex.h
 acc_simulation\main.o: ../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_uart.h
+acc_simulation\main.o: ../Lib/HC_SR04.h
+acc_simulation\main.o: C:\Users\Admin\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+acc_simulation\main.o: C:\Users\Admin\AppData\Local\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
