@@ -41,10 +41,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim1;
-TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 
@@ -53,10 +53,10 @@ UART_HandleTypeDef huart1;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -71,33 +71,15 @@ void PWM_generate(TIM_HandleTypeDef *htim, uint32_t Channel, float duty_cycle);
 #include "stdio.h"
 #include "string.h"
 
-long pulse_count = 0;
-float current_pulse, prev_pulse = 0;
-float speed;
+volatile uint32_t pulse_count = 0;
+volatile static  float current_pulse, prev_pulse = 0;
+volatile static float speed;
 
-float delta_t = 0.01; //Ftim
-float set_point = 50, Kp = 10, Ki = 4, Kd = 1;
-float output;
-float current_measure, err = 0, prev_err = 0;
-float integral = 0, derivative = 0;
-
-//==========================Speed simulation=========================
-static float sim_speed = 0;        // current speed (RPM)
-static float max_speed = 200.0;    // max speed
-static float alpha = 0.05;         // response constant 0 < alpha < 1 
-
-void Motor_Simulation(float duty)
-{
-    if(duty < 0) duty = 0;
-    if(duty > 100) duty = 100;
-    float target_speed = duty * max_speed / 100.0;
-    sim_speed = sim_speed + alpha * (target_speed - sim_speed);
-}
-
-float Get_Simulated_Speed(void)
-{
-    return sim_speed;
-}
+volatile static float delta_t = 0.2; //Ftim
+volatile float set_point = 50, Kp = 2.5, Ki = 0.2, Kd = 0.01;
+volatile float output;
+volatile float current_measure, err = 0, prev_err = 0;
+volatile static float integral = 0, derivative = 0;
 
 //===============Measure speed and PID handle===========================
 void Speed_Control()
@@ -120,14 +102,13 @@ void Speed_Control()
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(htim->Instance == htim2.Instance)
-	{
-		current_pulse = pulse_count;
-		speed = (current_pulse-prev_pulse)/360/delta_t*60; // RPM
-		prev_pulse = current_pulse;
-	}
 	if(htim->Instance == htim1.Instance)
 	{
+		//Calc speed
+		current_pulse = pulse_count;
+		speed = ((float)(current_pulse-prev_pulse))/360/delta_t*60.0f; // RPM
+		prev_pulse = current_pulse;
+		//PID Handler
 		current_measure = speed;
 		err = set_point-current_measure;
 		
@@ -140,20 +121,26 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		{
 			output = 100;
 		}
-		if(output < -100)
+		if(output < 0)
 		{
-			output = -100;
+			output = 0;
 		}
-		Speed_Control();
 		prev_err = err;
+		Speed_Control();
+		
 	}
 }
 //===============================PWM handle================
 void PWM_generate(TIM_HandleTypeDef *htim, uint32_t Channel, float duty_cycle)
 {
-	uint16_t arr = __HAL_TIM_GET_AUTORELOAD(htim);
-	uint32_t ccr = (duty_cycle/100) * (arr + 1);
+	uint32_t arr = __HAL_TIM_GET_AUTORELOAD(htim);
+	uint32_t ccr = (uint32_t)((duty_cycle * (arr + 1)) / 100.0f);
 	__HAL_TIM_SET_COMPARE(htim, Channel, ccr);
+	
+//	char buff[64];
+//	sprintf(buff, "out=%.1f, CCR=%lu/%lu => %.1f%%\r\n",
+//       output, ccr, arr, 100.0f * ccr / (arr + 1));
+//	HAL_UART_Transmit_IT(&huart1, buff, strlen(buff));
 }
 //===============Pulse count====================
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -191,32 +178,16 @@ void Stop()
 	HAL_GPIO_WritePin(GPIOB, IN2_Pin, 0);
 	//HAL_GPIO_WritePin(GPIOB, ENA_Pin, 0);
 }
-
-void Choose_State_Handle()
+//==============DMA UART HANDLE========================
+static char buff_uart[64];
+void Print_uart(float set_point, uint32_t pulse_count, float speed, float err, float output)
 {
-	uint8_t state;
-	char buff_uart[32];
 	
-	if(HAL_GPIO_ReadPin(GPIOB, BTN_CLOCK_WISE_Pin)==0)
-	{
-		Turn_Clock_wise();
-		sprintf(buff_uart, "C: %ld pulse \r\n", pulse_count);
-		HAL_UART_Transmit(&huart1, (uint8_t*)buff_uart, sizeof(buff_uart), 100);
-	}
-	else if(HAL_GPIO_ReadPin(GPIOB, BTN_COUNTER_CLOCK_WISE_Pin)==0)
-	{
-		Turn_Counter_Clock_wise();
-		sprintf(buff_uart, "C_C: %ld pulse \r\n", pulse_count);
-		HAL_UART_Transmit(&huart1, (uint8_t*)buff_uart, sizeof(buff_uart), 100);
-	}
-	else if(HAL_GPIO_ReadPin(GPIOB, BTN_STOP_Pin)==0)
-	{
-		Stop();
-		sprintf(buff_uart, "S: %ld pulse \r\n", pulse_count);
-		HAL_UART_Transmit(&huart1, (uint8_t*)buff_uart, sizeof(buff_uart), 100);
-	}
+	sprintf(buff_uart, "Set=%.f, Pulse=%ld, V=%.2f, err=%.2f, Out=%.2f\r\n", 
+						 set_point, pulse_count,speed,err,output);
+	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)buff_uart, strlen(buff_uart));
 }
-
+	  
 
 /* USER CODE END 0 */
 
@@ -249,15 +220,14 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_TIM4_Init();
   MX_TIM1_Init();
-  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   
   HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim1);
-  HAL_TIM_Base_Start_IT(&htim2);
   //PWM_generate(&htim4, TIM_CHANNEL_1, 80);
   /* USER CODE END 2 */
 
@@ -268,10 +238,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  char buff_uart[64];
-	  sprintf(buff_uart, "Pulse=%ld, V=%.2f, err=%.2f, duty=%.2f\r\n", 
-						 pulse_count,speed,err,output);
-	  HAL_UART_Transmit_IT(&huart1, (uint8_t*)buff_uart, strlen(buff_uart));
+	  Print_uart(set_point,pulse_count,speed,err,output);
 	  HAL_Delay(100);
   }
   /* USER CODE END 3 */
@@ -334,9 +301,9 @@ static void MX_TIM1_Init(void)
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 63;
+  htim1.Init.Prescaler = 639;
   htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 9999;
+  htim1.Init.Period = 12800;
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -362,51 +329,6 @@ static void MX_TIM1_Init(void)
 }
 
 /**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 63;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 9999;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-
-}
-
-/**
   * @brief TIM4 Initialization Function
   * @param None
   * @retval None
@@ -426,9 +348,9 @@ static void MX_TIM4_Init(void)
 
   /* USER CODE END TIM4_Init 1 */
   htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
+  htim4.Init.Prescaler = 63;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 4266;
+  htim4.Init.Period = 99;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
@@ -499,6 +421,22 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -528,12 +466,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(ENCODER_B_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : BTN_CLOCK_WISE_Pin BTN_COUNTER_CLOCK_WISE_Pin BTN_STOP_Pin */
-  GPIO_InitStruct.Pin = BTN_CLOCK_WISE_Pin|BTN_COUNTER_CLOCK_WISE_Pin|BTN_STOP_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : IN1_Pin IN2_Pin */
   GPIO_InitStruct.Pin = IN1_Pin|IN2_Pin;

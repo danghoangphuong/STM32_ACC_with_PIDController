@@ -64,12 +64,6 @@ void Error_Handler(void);
 #define ENCODER_A_EXTI_IRQn EXTI0_IRQn
 #define ENCODER_B_Pin GPIO_PIN_1
 #define ENCODER_B_GPIO_Port GPIOA
-#define BTN_CLOCK_WISE_Pin GPIO_PIN_13
-#define BTN_CLOCK_WISE_GPIO_Port GPIOB
-#define BTN_COUNTER_CLOCK_WISE_Pin GPIO_PIN_14
-#define BTN_COUNTER_CLOCK_WISE_GPIO_Port GPIOB
-#define BTN_STOP_Pin GPIO_PIN_15
-#define BTN_STOP_GPIO_Port GPIOB
 #define IN1_Pin GPIO_PIN_3
 #define IN1_GPIO_Port GPIOB
 #define IN2_Pin GPIO_PIN_4
